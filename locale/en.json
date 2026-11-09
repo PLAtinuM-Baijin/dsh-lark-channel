@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Feishu Channel",
+    "description": "Keeps a Feishu (Lark) long connection open, routes each chat to its own session, and replies with the agent's answer."
+  }
+}

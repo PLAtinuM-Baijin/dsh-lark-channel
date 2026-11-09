@@ -1,0 +1,224 @@
+# feishu-channel bundle：channel 插件 + 每晚记忆整理插件 + 三个 agent preset。
+# 装到某个 profile 后，profile 启动即连飞书；一行 fire-and-forget，不需要 MCP 轮询。
+
+- insert:
+    # 常驻 channel：连接、按 chat 路由、触发 agent 回合，都在这个插件里。
+    - id: feishu-channel
+      name: '@local/dsh-feishu-channel'
+      config:
+        # 密钥不要写进 YAML：Loader 在激活时对这段表达式求值。
+        appId: !!js process.env.FEISHU_APP_ID
+        appSecret: !!js process.env.FEISHU_APP_SECRET
+        cwd: !!js process.env.FEISHU_CWD
+        agentPreset: feishu
+        # 主人私聊单独用高权限 preset；chat_id 来自飞书事件，消息内容改不了路由。
+        ownerChatId: !!js (process.env.FEISHU_OWNER_CHAT_ID || '')
+        ownerPreset: feishu-power
+        replyTimeoutMs: 180000
+        ownerReplyTimeoutMs: 900000
+        requireMentionInGroup: true
+        # 空白名单 = 谁都不回；首次接入时看日志里的 chat= / sender=，再填这两个环境变量。
+        allowedChatIds: !!js (process.env.FEISHU_ALLOWED_CHAT_IDS || '').split(',')
+        allowedOpenIds: !!js (process.env.FEISHU_ALLOWED_OPEN_IDS || '').split(',')
+        sessionPrefix: feishu-
+        timeZone: Asia/Shanghai
+        logLevel: info
+
+    # 每晚的顶层记忆整理：读最近会话 → 让 feishu-root 用 feishu_memory 工具整理。
+    - id: feishu-memory-curator
+      name: '@local/dsh-feishu-channel/memory-curator'
+      config:
+        memoryDir: !!js (process.env.FEISHU_MEMORY_DIR || '')
+        curatorTime: !!js (process.env.FEISHU_CURATOR_TIME || '03:17')
+
+    # 这个 preset 决定飞书会话能用什么：没有 shell、没有文件读写、没有 jobs。
+    - id: preset-feishu
+      name: '@deepseek-ai/dsh-agent-preset'
+      config:
+        id: feishu
+        name: 飞书机器人
+        description: 纯对话：无 shell、无文件读写、无后台任务。
+        order: 20
+        plugins:
+          # 从 FEISHU_CWD/AGENTS.md 加载守则；dsh-base 里这一行默认 disabled。
+          - id: agent-instructions
+            name: '@deepseek-ai/dsh-agent-instructions'
+            config:
+              maxBytes: 65536
+          - id: persona
+            name: '@deepseek-ai/dsh-persona'
+            config:
+              prefix: |-
+                你是部署在飞书里的对话机器人。默认用中文，先给结论，再给理由。
+                飞书消息按 Markdown 渲染（CommonMark + GFM），可用标题、列表、表格和代码块，但要克制。
+          - id: time-context
+            name: '@deepseek-ai/dsh-time-context'
+          # 每次请求前注入：全局记忆 + 本 chat 的记忆（只读）。
+          - id: memory-context
+            name: '@local/dsh-feishu-channel/memory-context'
+            config:
+              memoryDir: !!js (process.env.FEISHU_MEMORY_DIR || '')
+          # 记忆读写工具；作用域守卫在插件里硬编码。
+          - id: memory-tool
+            name: '@local/dsh-feishu-channel/memory-tool'
+            config:
+              memoryDir: !!js (process.env.FEISHU_MEMORY_DIR || '')
+              ownerChatId: !!js (process.env.FEISHU_OWNER_CHAT_ID || '')
+          # web 模板把压缩后端禁用了，preset 自己挂一份，长会话才不会无限膨胀。
+          - id: compaction
+            name: cordis:group
+            group: true
+            isolate:
+              compaction: true
+              toolResultPruner: true
+            config:
+              - id: compaction-basic
+                name: '@deepseek-ai/dsh-compaction-basic'
+              - id: tool-result-pruner
+                name: '@deepseek-ai/dsh-compaction-tool-result-pruner'
+                config:
+                  thresholdChars: 8192
+                  headChars: 4096
+                  tailChars: 1024
+
+    # 主人私聊专用：等同一个跑在服务器上的 agent，工具齐全。
+    - id: preset-feishu-power
+      name: '@deepseek-ai/dsh-agent-preset'
+      config:
+        id: feishu-power
+        name: 飞书机器人（owner 全权限）
+        description: 主人私聊专用：shell、文件、搜索、网页、后台任务、子代理。
+        order: 22
+        plugins:
+          - id: persona
+            name: '@deepseek-ai/dsh-persona'
+            config:
+              prefix: |-
+                你是部署在飞书里的主人专属服务器助手。默认用中文，先给结论，再给理由。
+                飞书消息按 Markdown 渲染（CommonMark + GFM），可用标题、列表、表格和代码块，但要克制。
+          # 主人版守则：能力、执行边界、密钥卫生、防注入。群聊继续用 AGENTS.md。
+          - id: agent-instructions
+            name: '@deepseek-ai/dsh-agent-instructions'
+            config:
+              maxBytes: 65536
+              instructionFileCandidates:
+                - POWER.md
+          - id: time-context
+            name: '@deepseek-ai/dsh-time-context'
+          - id: memory-context
+            name: '@local/dsh-feishu-channel/memory-context'
+            config:
+              memoryDir: !!js (process.env.FEISHU_MEMORY_DIR || '')
+          - id: memory-tool
+            name: '@local/dsh-feishu-channel/memory-tool'
+            config:
+              memoryDir: !!js (process.env.FEISHU_MEMORY_DIR || '')
+              ownerChatId: !!js (process.env.FEISHU_OWNER_CHAT_ID || '')
+          - id: tool-bash
+            name: '@deepseek-ai/dsh-tool-bash'
+            disabled: !!js process.platform === 'win32'
+          - id: tool-fs
+            name: '@deepseek-ai/dsh-tool-fs'
+          - id: tool-fs-search
+            name: '@deepseek-ai/dsh-tool-fs-search'
+            config:
+              sampleOverCapGlobResults: false
+          - id: tool-jobs
+            name: '@deepseek-ai/dsh-tool-jobs'
+          - id: tool-todo
+            name: '@deepseek-ai/dsh-tool-todo'
+            config:
+              allowParallelInProgress: true
+          - id: tool-web
+            name: '@deepseek-ai/dsh-tool-web'
+            config:
+              fetch: true
+              searchTimeoutMs: 60000
+          - id: skill-filesystem
+            name: '@deepseek-ai/dsh-skill-filesystem'
+          - id: tool-skill
+            name: '@deepseek-ai/dsh-tool-skill'
+          - id: compaction
+            name: cordis:group
+            group: true
+            isolate:
+              compaction: true
+              toolResultPruner: true
+            config:
+              - id: compaction-basic
+                name: '@deepseek-ai/dsh-compaction-basic'
+              - id: tool-result-pruner
+                name: '@deepseek-ai/dsh-compaction-tool-result-pruner'
+                config:
+                  thresholdChars: 8192
+                  headChars: 4096
+                  tailChars: 1024
+          - id: delegation
+            name: cordis:group
+            group: true
+            isolate:
+              workflowEngine: true
+            config:
+              - id: tool-subagent-control
+                name: '@deepseek-ai/dsh-tool-subagent-control'
+              - id: tool-subagent-list-agents
+                name: '@deepseek-ai/dsh-tool-subagent-control/list-agents'
+              - id: tool-subagent
+                name: '@deepseek-ai/dsh-tool-subagent'
+                config:
+                  provider: spawn
+                  toolName: subagent
+                  modelSelectionSettings: true
+              - id: tool-subagent-fork
+                name: '@deepseek-ai/dsh-tool-subagent'
+                config:
+                  provider: fork
+                  toolName: subagent_fork
+              - id: workflow-ptc
+                name: '@deepseek-ai/dsh-workflow-ptc'
+                config:
+                  provider: spawn
+              - id: tool-workflow
+                name: '@deepseek-ai/dsh-tool-workflow'
+
+    # 顶层整理会话（feishu-root）专用：只注入全局记忆，可跨 chatId 操作。
+    - id: preset-feishu-curator
+      name: '@deepseek-ai/dsh-agent-preset'
+      config:
+        id: feishu-curator
+        name: 飞书记忆整理员
+        description: 只整理记忆：无 shell、无文件读写、不对外发消息。
+        order: 21
+        plugins:
+          - id: persona
+            name: '@deepseek-ai/dsh-persona'
+            config:
+              prefix: |-
+                你是飞书机器人的记忆整理员。每次任务给你一批对话摘要，
+                你只负责用 feishu_memory 工具写入、合并、清理长期记忆，不做其他事。
+          - id: time-context
+            name: '@deepseek-ai/dsh-time-context'
+          - id: memory-context
+            name: '@local/dsh-feishu-channel/memory-context'
+            config:
+              memoryDir: !!js (process.env.FEISHU_MEMORY_DIR || '')
+          - id: memory-tool
+            name: '@local/dsh-feishu-channel/memory-tool'
+            config:
+              memoryDir: !!js (process.env.FEISHU_MEMORY_DIR || '')
+              ownerChatId: !!js (process.env.FEISHU_OWNER_CHAT_ID || '')
+          - id: compaction
+            name: cordis:group
+            group: true
+            isolate:
+              compaction: true
+              toolResultPruner: true
+            config:
+              - id: compaction-basic
+                name: '@deepseek-ai/dsh-compaction-basic'
+              - id: tool-result-pruner
+                name: '@deepseek-ai/dsh-compaction-tool-result-pruner'
+                config:
+                  thresholdChars: 8192
+                  headChars: 4096
+                  tailChars: 1024

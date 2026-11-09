@@ -1,0 +1,43 @@
+{
+  "name": "@local/dsh-feishu-channel",
+  "version": "0.1.0",
+  "private": true,
+  "description": "飞书（Lark）常驻 channel 插件：WS 长连接收消息，按 chat 路由到独立 dsh Session，并把回答发回飞书。",
+  "type": "module",
+  "license": "MIT",
+  "engines": {
+    "dsh": ">=0.2.1-rc.1 <0.3.0-0",
+    "node": ">=20"
+  },
+  "exports": {
+    ".": "./index.js",
+    "./memory-store": "./memory-store.js",
+    "./memory-context": "./memory-context.js",
+    "./memory-tool": "./memory-tool.js",
+    "./memory-curator": "./memory-curator.js",
+    "./package.json": "./package.json",
+    "./locale/*.json": "./locale/*.json",
+    "./icon": "./icon.svg"
+  },
+  "files": [
+    "index.js",
+    "memory-store.js",
+    "memory-context.js",
+    "memory-tool.js",
+    "memory-curator.js",
+    "cordis.patch.yml",
+    "AGENTS.md",
+    "POWER.md",
+    "locale/*.json",
+    "icon.svg"
+  ],
+  "dependencies": {
+    "@larksuiteoapi/node-sdk": "^1.59.0",
+    "@deepseek-ai/schemastery": "^3.18.5"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  }
+}

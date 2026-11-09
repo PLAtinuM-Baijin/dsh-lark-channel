@@ -1,0 +1,18 @@
+[Unit]
+Description=dsh feishu channel
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/home/ubuntu
+EnvironmentFile=/home/ubuntu/.dsh-feishu.env
+ExecStart=/home/ubuntu/.npm/_npx/1e7f6d9597241db0/node_modules/.bin/dsh --profile feishu --no-open --port 3080
+Restart=always
+RestartSec=5
+KillSignal=SIGTERM
+TimeoutStopSec=20
+
+[Install]
+WantedBy=multi-user.target
