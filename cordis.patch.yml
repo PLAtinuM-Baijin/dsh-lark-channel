@@ -14,8 +14,19 @@
         # 主人私聊单独用高权限 preset；chat_id 来自飞书事件，消息内容改不了路由。
         ownerChatId: !!js (process.env.FEISHU_OWNER_CHAT_ID || '')
         ownerPreset: feishu-power
+        # 一轮里没有新产出/新消息时的等待上限；有新消息或新产出会重新计时。
         replyTimeoutMs: 180000
         ownerReplyTimeoutMs: 900000
+        # 单轮绝对上限（含中途追加消息）；避免群聊刷屏把一轮无限延长。
+        maxTurnMs: 1800000
+        # 流式卡片：飞书端打字机效果；关掉就退回每步一条普通富文本消息。
+        cardStreaming: !!js (process.env.FEISHU_CARD_STREAMING || 'true') !== 'false'
+        # 网页面板里在当天主人会话中发起的对话，同步镜像到飞书（问题带 [user asked from web]）。
+        syncWebToFeishu: !!js (process.env.FEISHU_SYNC_WEB || 'true') !== 'false'
+        # 定时任务落盘位置；空字符串时用 ~/.dsh-feishu-schedules.json。
+        scheduleFile: !!js (process.env.FEISHU_SCHEDULE_FILE || '')
+        # 本地聊天历史（含 message_id）；空字符串时用 ~/.dsh-feishu-history。
+        historyDir: !!js (process.env.FEISHU_HISTORY_DIR || '')
         requireMentionInGroup: true
         # 空白名单 = 谁都不回；首次接入时看日志里的 chat= / sender=，再填这两个环境变量。
         allowedChatIds: !!js (process.env.FEISHU_ALLOWED_CHAT_IDS || '').split(',')
@@ -30,6 +41,11 @@
       config:
         memoryDir: !!js (process.env.FEISHU_MEMORY_DIR || '')
         curatorTime: !!js (process.env.FEISHU_CURATOR_TIME || '03:17')
+
+    # 控制面板：Host JSON 路由 + 浏览器 bundle。单独的包（ui/package.json），
+    # 因为 channel 包里已有两个 Loader 条目指向同一 package.json，不能再声明 dsh.client。
+    - id: feishu-panel
+      name: /home/ubuntu/feishu-channel/ui/index.js
 
     # 这个 preset 决定飞书会话能用什么：没有 shell、没有文件读写、没有 jobs。
     - id: preset-feishu
@@ -64,6 +80,14 @@
             config:
               memoryDir: !!js (process.env.FEISHU_MEMORY_DIR || '')
               ownerChatId: !!js (process.env.FEISHU_OWNER_CHAT_ID || '')
+          # 每轮注入最近聊天记录（含 message_id），让模型知道该引用哪句。
+          - id: history-context
+            name: '@local/dsh-feishu-channel/history-context'
+            config:
+              historyDir: !!js (process.env.FEISHU_HISTORY_DIR || '')
+          # 模型选择发送方式：引用回复某条，或直接发一条新消息。
+          - id: reply-tool
+            name: '@local/dsh-feishu-channel/reply-tool'
           # web 模板把压缩后端禁用了，preset 自己挂一份，长会话才不会无限膨胀。
           - id: compaction
             name: cordis:group
@@ -87,7 +111,7 @@
       config:
         id: feishu-power
         name: 飞书机器人（owner 全权限）
-        description: 主人私聊专用：shell、文件、搜索、网页、后台任务、子代理。
+        description: 主人私聊专用：shell、文件、搜索、网页、后台任务、子代理、发文件回飞书。
         order: 22
         plugins:
           - id: persona
@@ -114,6 +138,53 @@
             config:
               memoryDir: !!js (process.env.FEISHU_MEMORY_DIR || '')
               ownerChatId: !!js (process.env.FEISHU_OWNER_CHAT_ID || '')
+          # 每轮注入最近聊天记录（含 message_id），让模型知道该引用哪句。
+          - id: history-context
+            name: '@local/dsh-feishu-channel/history-context'
+            config:
+              historyDir: !!js (process.env.FEISHU_HISTORY_DIR || '')
+          # 模型选择发送方式：引用回复某条，或直接发一条新消息。
+          - id: reply-tool
+            name: '@local/dsh-feishu-channel/reply-tool'
+          # 飞书 MCP（文档/日历/任务/wiki/通讯录/读消息）；只挂给 owner 私聊。
+          # 收消息和回复仍由 channel 负责，MCP 不开 WS、不发消息。
+          - id: mcp-client-feishu
+            name: '@deepseek-ai/dsh-mcp-client'
+            config:
+              transport: stdio
+              serverName: feishu
+              command: node
+              args:
+                - /home/ubuntu/lark-mcp-dsh/node_modules/tsx/dist/cli.mjs
+                - /home/ubuntu/lark-mcp-dsh/src/index.ts
+              env:
+                LARK_APP_ID: !!js process.env.FEISHU_APP_ID
+                LARK_APP_SECRET: !!js process.env.FEISHU_APP_SECRET
+                LARK_TIMEZONE: Asia/Shanghai
+                LARK_OWNER_OPEN_ID: !!js (process.env.FEISHU_ALLOWED_OPEN_IDS || '').split(',')[0]
+              cwd: /home/ubuntu/lark-mcp-dsh
+              # OAuth 设备码流程会在工具调用里阻塞最多 10 分钟，留足余量。
+              toolCallTimeoutMs: 660000
+          # 把服务器上的文件/图片发回飞书；只挂在这里，群聊 preset 没有。
+          - id: send-file
+            name: '@local/dsh-feishu-channel/send-file'
+            config:
+              appId: !!js process.env.FEISHU_APP_ID
+              appSecret: !!js process.env.FEISHU_APP_SECRET
+              ownerChatId: !!js (process.env.FEISHU_OWNER_CHAT_ID || '')
+              cwd: !!js (process.env.FEISHU_CWD || '')
+          # 主动发一条新消息（不引用消息）；同样只给 owner 私聊。
+          - id: send-text
+            name: '@local/dsh-feishu-channel/send-text'
+            config:
+              ownerChatId: !!js (process.env.FEISHU_OWNER_CHAT_ID || '')
+              allowedChatIds: !!js (process.env.FEISHU_ALLOWED_CHAT_IDS || '').split(',')
+          # 定时任务：到点唤醒聊天当天会话，回复作为新消息发出。
+          - id: schedule-tool
+            name: '@local/dsh-feishu-channel/schedule-tool'
+            config:
+              ownerChatId: !!js (process.env.FEISHU_OWNER_CHAT_ID || '')
+              allowedChatIds: !!js (process.env.FEISHU_ALLOWED_CHAT_IDS || '').split(',')
           - id: tool-bash
             name: '@deepseek-ai/dsh-tool-bash'
             disabled: !!js process.platform === 'win32'

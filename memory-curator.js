@@ -14,6 +14,7 @@ import fsp from 'node:fs/promises'
 import path from 'node:path'
 import { randomUUID } from 'node:crypto'
 import Schema from '@deepseek-ai/schemastery'
+import { setCuratorRuntime } from './curator-runtime.js'
 import { memoryDir, setMemoryDir } from './memory-store.js'
 
 export const name = 'feishu-memory-curator'
@@ -97,17 +98,69 @@ export function apply(ctx, config) {
     'feishu-memory-curator.timer',
   )
 
-  const state = readState()
+  const savedState = readState()
+  /** 面板展示用的运行状态；从这里开始维护，进程重启时用状态文件里的值兜底。 */
+  const runtimeStatus = {
+    lastRunAt: typeof savedState.lastRunAt === 'number' ? savedState.lastRunAt : undefined,
+    lastSessions: typeof savedState.sessions === 'number' ? savedState.sessions : undefined,
+    lastChars: typeof savedState.chars === 'number' ? savedState.chars : undefined,
+    lastTrigger: typeof savedState.trigger === 'string' ? savedState.trigger : undefined,
+    lastFinishedAt: undefined,
+    lastError: '',
+    nextRunAt: undefined,
+  }
+
   const now = Date.now()
   const staleAfterMs = config.catchUpHours * 3_600_000
-  if (typeof state.lastRunAt !== 'number' || now - state.lastRunAt >= staleAfterMs) {
+  if (typeof savedState.lastRunAt !== 'number' || now - savedState.lastRunAt >= staleAfterMs) {
     announce(`catch-up run scheduled in ${CATCH_UP_DELAY_MS / 1000}s`)
+    runtimeStatus.nextRunAt = now + CATCH_UP_DELAY_MS
     timer = setTimeout(() => {
       timer = undefined
       void runOnce('catch-up').finally(scheduleNextRun)
     }, CATCH_UP_DELAY_MS)
   } else {
     scheduleNextRun()
+  }
+
+  // 面板通过这份运行时读状态、手动触发一次整理。
+  ctx.effect(
+    () =>
+      setCuratorRuntime({
+        status: curatorStatus,
+        runNow,
+      }),
+    'feishu-memory-curator.runtime',
+  )
+
+  function curatorStatus() {
+    return {
+      sessionId: curatorSessionId,
+      preset: agentPreset,
+      timeZone,
+      curatorTime: `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`,
+      memoryDir: memoryDir(),
+      running,
+      nextRunAt: runtimeStatus.nextRunAt,
+      lastRunAt: runtimeStatus.lastRunAt,
+      lastFinishedAt: runtimeStatus.lastFinishedAt,
+      lastTrigger: runtimeStatus.lastTrigger,
+      lastSessions: runtimeStatus.lastSessions,
+      lastChars: runtimeStatus.lastChars,
+      lastError: runtimeStatus.lastError,
+    }
+  }
+
+  /** 面板按钮触发：立即跑一轮；正在跑或已卸载时拒绝。 */
+  function runNow(trigger = 'panel') {
+    if (disposed || running) return { accepted: false }
+    if (timer !== undefined) {
+      clearTimeout(timer)
+      timer = undefined
+    }
+    runtimeStatus.nextRunAt = undefined
+    void runOnce(trigger).finally(scheduleNextRun)
+    return { accepted: true }
   }
 
   function scheduleNextRun() {
@@ -117,6 +170,7 @@ export function apply(ctx, config) {
       timer = undefined
     }
     const next = nextRunAt(Date.now())
+    runtimeStatus.nextRunAt = next
     const delay = Math.max(1000, next - Date.now())
     announce(`next run at ${new Date(next).toISOString()}`)
     timer = setTimeout(() => {
@@ -128,12 +182,13 @@ export function apply(ctx, config) {
   async function runOnce(trigger) {
     if (disposed || running) return
     running = true
+    runtimeStatus.lastError = ''
     const started = Date.now()
     try {
       const digest = await buildDigest()
       if (digest.sessions === 0) {
         announce(`no chat sessions in the last ${config.lookbackDays} days`)
-        await saveState({ lastRunAt: Date.now(), sessions: 0, chars: 0, trigger })
+        await recordRun({ sessions: 0, chars: 0, trigger })
         return
       }
 
@@ -151,18 +206,24 @@ export function apply(ctx, config) {
         throw new Error(`curation timed out after ${timeoutMs}ms`)
       }
       await ctx.sessions.flush(agent.session)
-      await saveState({
-        lastRunAt: Date.now(),
-        sessions: digest.sessions,
-        chars: digest.chars,
-        trigger,
-      })
+      await recordRun({ sessions: digest.sessions, chars: digest.chars, trigger })
       announce(`curated ${digest.sessions} sessions (${digest.chars} chars) in ${Date.now() - started}ms`)
     } catch (error) {
+      runtimeStatus.lastError = String(error)
       announce(`run failed: ${String(error)}`, 'error')
     } finally {
       running = false
+      runtimeStatus.lastFinishedAt = Date.now()
     }
+  }
+
+  async function recordRun({ sessions, chars, trigger }) {
+    const snapshot = { lastRunAt: Date.now(), sessions, chars, trigger }
+    await saveState(snapshot)
+    runtimeStatus.lastRunAt = snapshot.lastRunAt
+    runtimeStatus.lastSessions = sessions
+    runtimeStatus.lastChars = chars
+    runtimeStatus.lastTrigger = trigger
   }
 
   // --- 收集摘要 ---------------------------------------------------------

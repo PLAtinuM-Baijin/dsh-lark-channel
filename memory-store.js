@@ -263,6 +263,30 @@ export function listChat(chatId, section = 'facts') {
   return pickEntries(sections, [SECTION_TITLES[section]])
 }
 
+/** 有独立记忆文件的 chat 清单（面板展示用），按最近修改倒序。 */
+export async function listChatFiles() {
+  const dir = path.join(rootDir, 'chats')
+  let names
+  try {
+    names = await fsp.readdir(dir)
+  } catch {
+    return []
+  }
+  const files = []
+  for (const name of names) {
+    const match = /^(oc_[A-Za-z0-9]+)\.md$/.exec(name)
+    if (match === null) continue
+    const file = path.join(dir, name)
+    try {
+      const stat = await fsp.stat(file)
+      files.push({ chatId: match[1], bytes: stat.size, updatedAt: stat.mtimeMs })
+    } catch {
+      // 恰好被删掉的文件直接跳过。
+    }
+  }
+  return files.sort((a, b) => b.updatedAt - a.updatedAt)
+}
+
 function pickEntries(sections, titles) {
   const out = []
   for (const title of titles) {

@@ -1,0 +1,24 @@
+{
+  "name": "@local/dsh-feishu-panel",
+  "version": "0.1.0",
+  "private": true,
+  "description": "飞书通道控制面板：Host JSON 路由 + 挂在 Plugin Manager 行上的浏览器 bundle。",
+  "type": "module",
+  "exports": {
+    ".": "./index.js",
+    "./client": "./client.js",
+    "./params": "./params.js",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "index.js",
+    "client.js",
+    "params.js",
+    "package.json"
+  ],
+  "dsh": {
+    "client": {
+      "platform": "web"
+    }
+  }
+}
