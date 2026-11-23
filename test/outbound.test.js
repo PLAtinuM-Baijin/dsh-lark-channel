@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { outboundTarget } from '../outbound.js'
+import { outboundTarget } from '../src/outbound.js'
 
 test('outboundTarget：默认直发，只有显式 reply 才引用', () => {
   assert.equal(outboundTarget({ replyTo: undefined, proactive: false, delivery: undefined }), undefined)

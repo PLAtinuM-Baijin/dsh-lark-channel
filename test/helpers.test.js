@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { HISTORY_DIR, QUOTE_TEXT_LIMIT } from '../constants.js'
-import { cardText, historyTextOfInbound, messageItemText, parseJson, parsePost, parseText } from '../message-format.js'
+import { HISTORY_DIR, QUOTE_TEXT_LIMIT } from '../src/constants.js'
+import { cardText, historyTextOfInbound, messageItemText, parseJson, parsePost, parseText } from '../src/message-format.js'
 import {
   checkLark,
   describeLarkError,
@@ -11,8 +11,8 @@ import {
   isTextFile,
   safeFileName,
   streamToBuffer,
-} from '../lark-utils.js'
-import { clip, shorten, split } from '../text-utils.js'
+} from '../src/lark-utils.js'
+import { clip, shorten, split } from '../src/text-utils.js'
 
 test('parseText 还原 @ 并 trim', () => {
   assert.equal(parseText('{"text":"你好 @_user_1 晚安"}', [{ key: '@_user_1', name: '@张三' }]), '你好 @张三 晚安')

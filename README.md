@@ -8,36 +8,36 @@
 | 文件 | 作用 |
 |---|---|
 | `index.js` | Host 插件：`apply(ctx, config)` 里起 `WSClient`，装配各模块；白名单、会话状态（按天轮换）、撤回处理、调度器接线 |
-| `constants.js` | 运行参数与上限常量：下载上限、卡片推送/打印节奏、引用/合并转发限制等 |
-| `message-format.js` | 纯函数：text/post 解析、卡片文字提取、消息渲染、本地历史摘要 |
-| `lark-utils.js` | 纯函数：附件命名/类型判定、Lark 错误响应解析、流读取 |
-| `text-utils.js` | 文本工具：`shorten` / `clip` / `split` |
-| `inbound.js` | 入站：消息结构解析、撤回摘要、引用/合并转发读取、附件下载归档、图片入库（`createInbound` 工厂注入 `client`/`log`/`attachments`） |
-| `card-stream.js` | 流式卡片：chunk 帧打字机更新、end 帧收尾、打印队列排空、失败退回普通消息（`createCardStream`） |
-| `outbound.js` | 出站：引用回复/主动消息/安全兜底与 `outboundTarget` 发送目标（`createOutbound`） |
-| `turn-driver.js` | 回合驱动：steer 交付、driver 循环、超时取消、assistant 文本转播（`createTurnDriver`） |
-| `web-mirror.js` | 网页→飞书镜像：主人私聊的每日飞书会话（含往日）里网页发起的回合，先发 `[user asked from web] 问题`，再逐条转发助手文本（`createWebMirror`） |
-| `session-id.js` | `isOwnerSessionId`：判断 session id 是否为主人私聊的每日会话（网页镜像用） |
+| `src/constants.js` | 运行参数与上限常量：下载上限、卡片推送/打印节奏、引用/合并转发限制等 |
+| `src/message-format.js` | 纯函数：text/post 解析、卡片文字提取、消息渲染、本地历史摘要 |
+| `src/lark-utils.js` | 纯函数：附件命名/类型判定、Lark 错误响应解析、流读取 |
+| `src/text-utils.js` | 文本工具：`shorten` / `clip` / `split` |
+| `src/inbound.js` | 入站：消息结构解析、撤回摘要、引用/合并转发读取、附件下载归档、图片入库（`createInbound` 工厂注入 `client`/`log`/`attachments`） |
+| `src/card-stream.js` | 流式卡片：chunk 帧打字机更新、end 帧收尾、打印队列排空、失败退回普通消息（`createCardStream`） |
+| `src/outbound.js` | 出站：引用回复/主动消息/安全兜底与 `outboundTarget` 发送目标（`createOutbound`） |
+| `src/turn-driver.js` | 回合驱动：steer 交付、driver 循环、超时取消、assistant 文本转播（`createTurnDriver`） |
+| `src/web-mirror.js` | 网页→飞书镜像：主人私聊的每日飞书会话（含往日）里网页发起的回合，先发 `[user asked from web] 问题`，再逐条转发助手文本（`createWebMirror`） |
+| `src/session-id.js` | `isOwnerSessionId`：判断 session id 是否为主人私聊的每日会话（网页镜像用） |
 | `test/helpers.test.js` | `node --test` 冒烟用例（纯函数与常量，`npm test` 运行） |
 | `test/inbound.test.js` | 入站解析/摘要/合并转发渲染用例 |
 | `test/outbound.test.js` | 发送目标选择用例（直发/引用/主动） |
 | `test/web-mirror.test.js` | 网页镜像用例（问题前缀、镜像去重、channel 驱动时不重复转发） |
 | `test/session-id.test.js` | 主人会话 id 判定用例 |
 | `test/panel.test.js` | 面板参数投影/校验与 client bundle 注册用例 |
-| `memory-store.js` | 记忆存储层：Markdown 文件、原子写、mtime 缓存、条数/字节上限 |
-| `memory-context.js` | Preset 插件：每回合注入全局记忆 + 当前 chat 记忆（只读） |
-| `memory-tool.js` | Preset 插件：注册 `feishu_memory` 工具，作用域守卫硬编码 |
-| `memory-curator.js` | Host 插件：每晚把最近会话摘要交给 `feishu-root` 整理写入 |
-| `history-store.js` | 本地聊天历史：每 chat 一个 JSONL，记录用户/机器人可见消息与 `message_id`，原子写、条数上限 |
-| `history-context.js` | Preset 插件：每轮注入最近聊天记录（含 `message_id`）和发送方式说明 |
-| `reply-tool.js` | Preset 插件：注册 `feishu_reply_mode` 工具，模型选择引用回复或直接发送 |
-| `send-file.js` | Preset 插件：注册 `feishu_send_file` 工具，把服务器文件/图片发回 owner 私聊 |
-| `send-text.js` | Preset 插件：注册 `feishu_send_text` 工具，随时主动发一条新消息（不引用） |
-| `schedule-tool.js` | Preset 插件：注册 `feishu_schedule` 工具，创建/查看/取消定时任务 |
-| `scheduler.js` | 定时任务存储与时间计算：JSON 持久化、每日滚动、错过补跑策略 |
-| `channel-runtime.js` | Host 插件与 preset 工具之间的单例接口（`sendChatText` / 任务增删查 / `setDelivery`） |
-| `panel-runtime.js` | Host 插件与面板 Host 半身之间的单例接口（快照 / 动作 / 记忆明细） |
-| `curator-runtime.js` | 记忆整理插件的运行时状态与 `runNow` 单例接口 |
+| `src/memory-store.js` | 记忆存储层：Markdown 文件、原子写、mtime 缓存、条数/字节上限 |
+| `src/memory-context.js` | Preset 插件：每回合注入全局记忆 + 当前 chat 记忆（只读） |
+| `src/memory-tool.js` | Preset 插件：注册 `feishu_memory` 工具，作用域守卫硬编码 |
+| `src/memory-curator.js` | Host 插件：每晚把最近会话摘要交给 `feishu-root` 整理写入 |
+| `src/history-store.js` | 本地聊天历史：每 chat 一个 JSONL，记录用户/机器人可见消息与 `message_id`，原子写、条数上限 |
+| `src/history-context.js` | Preset 插件：每轮注入最近聊天记录（含 `message_id`）和发送方式说明 |
+| `src/reply-tool.js` | Preset 插件：注册 `feishu_reply_mode` 工具，模型选择引用回复或直接发送 |
+| `src/send-file.js` | Preset 插件：注册 `feishu_send_file` 工具，把服务器文件/图片发回 owner 私聊 |
+| `src/send-text.js` | Preset 插件：注册 `feishu_send_text` 工具，随时主动发一条新消息（不引用） |
+| `src/schedule-tool.js` | Preset 插件：注册 `feishu_schedule` 工具，创建/查看/取消定时任务 |
+| `src/scheduler.js` | 定时任务存储与时间计算：JSON 持久化、每日滚动、错过补跑策略 |
+| `src/channel-runtime.js` | Host 插件与 preset 工具之间的单例接口（`sendChatText` / 任务增删查 / `setDelivery`） |
+| `src/panel-runtime.js` | Host 插件与面板 Host 半身之间的单例接口（快照 / 动作 / 记忆明细） |
+| `src/curator-runtime.js` | 记忆整理插件的运行时状态与 `runNow` 单例接口 |
 | `ui/index.js` | 面板 Host 半身（独立包 `@local/dsh-feishu-panel`）：`/feishu-panel/*` JSON 路由 |
 | `ui/params.js` | 面板参数纯函数：`settings.describe` 行投影、写入校验、路由前缀归一化 |
 | `ui/presets.js` | 工具挂载纯函数：`plugins` 行树投影、按路径切换 `disabled` |
@@ -220,7 +220,7 @@ feishu-channel: ignored message chat=oc_xxx chat_type=p2p sender=ou_xxx (not all
 - 流式卡片、分片普通消息、超时/出错提示都按同一个选择走。卡片在正文开始流出时建好，之后再调工具不会改变已经发出的那张卡。
 - **引用兜底**：如果引用目标被撤回/删除，`im.message.reply` 会失败；channel 自动改用 `im.message.create` 把同一条内容发成新消息（流式卡片同样处理），不会再把回复吞掉。
 
-本地历史（`history-store.js`）：
+本地历史（`src/history-store.js`）：
 
 - 每 chat 一个 JSONL：`~/.dsh-feishu-history/<chat_id>.jsonl`（目录 0700、文件 0600，临时文件 + rename 原子写）。
 - 只记机器人收到/发出的可见消息，用户消息带 `message_id`，机器人消息记终稿和实际发出的消息 id；图片/语音/视频只记占位符。
@@ -322,8 +322,8 @@ ssh ubuntu@<服务器> "journalctl -u dsh-feishu --no-pager | grep 'dsh web:' | 
 
 | 部分 | 位置 | 作用 |
 |---|---|---|
-| 运行状态单例 | `panel-runtime.js` | channel 注册 `snapshot` / `action` / `memoryChat`，面板 Host 半身按需读取 |
-| 整理器单例 | `curator-runtime.js` | 整理器注册 `status()` 与 `runNow()`，面板可手动触发 |
+| 运行状态单例 | `src/panel-runtime.js` | channel 注册 `snapshot` / `action` / `memoryChat`，面板 Host 半身按需读取 |
+| 整理器单例 | `src/curator-runtime.js` | 整理器注册 `status()` 与 `runNow()`，面板可手动触发 |
 | Host 半身 | `ui/index.js`（独立包 `@local/dsh-feishu-panel`） | `/feishu-panel/*` JSON 路由；参数读写委托 `settings` 服务 |
 | 浏览器 bundle | `ui/client.js` | 注册 `sidebar.panellist`（id `feishu`，订单 20）做侧栏图标，注册 keyed `main`（key `feishu`）做整页控制台 |
 

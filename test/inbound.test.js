@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { parseInbound, renderMergedForward, summarizeInbound } from '../inbound.js'
+import { parseInbound, renderMergedForward, summarizeInbound } from '../src/inbound.js'
 
 const postContent = JSON.stringify({
   title: '标题',

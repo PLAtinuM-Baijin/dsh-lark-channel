@@ -18,7 +18,7 @@
  * 工具挂载走 configEditor：校验后写回 profile patch，并热重载 preset 条目。
  */
 import Schema from '@deepseek-ai/schemastery'
-import { getPanelRuntime } from '../panel-runtime.js'
+import { getPanelRuntime } from '../src/panel-runtime.js'
 import { checkParamValue, describeParams, normalizeBase } from './params.js'
 import { describePlugins, setPluginDisabled, validPath } from './presets.js'
 

@@ -49,12 +49,12 @@ import { homedir } from 'node:os'
 import { join } from 'node:path'
 import * as Lark from '@larksuiteoapi/node-sdk'
 import Schema from '@deepseek-ai/schemastery'
-import { createCardStream } from './card-stream.js'
-import { setChannelRuntime } from './channel-runtime.js'
-import { HANDLED_MESSAGE_TYPES, RECENT_LIMIT, SCHEDULE_TICK_MS, SEEN_LIMIT, VERSION } from './constants.js'
-import { getCuratorRuntime } from './curator-runtime.js'
-import { configureHistory, hasMessage, recordMessage, removeMessage } from './history-store.js'
-import { createInbound, parseInbound, summarizeInbound } from './inbound.js'
+import { createCardStream } from './src/card-stream.js'
+import { setChannelRuntime } from './src/channel-runtime.js'
+import { HANDLED_MESSAGE_TYPES, RECENT_LIMIT, SCHEDULE_TICK_MS, SEEN_LIMIT, VERSION } from './src/constants.js'
+import { getCuratorRuntime } from './src/curator-runtime.js'
+import { configureHistory, hasMessage, recordMessage, removeMessage } from './src/history-store.js'
+import { createInbound, parseInbound, summarizeInbound } from './src/inbound.js'
 import {
   isValidChatId,
   listChat,
@@ -63,14 +63,14 @@ import {
   memoryDir,
   renderChat,
   renderGlobal,
-} from './memory-store.js'
-import { historyTextOfInbound } from './message-format.js'
-import { createOutbound, outboundTarget } from './outbound.js'
-import { setPanelRuntime } from './panel-runtime.js'
-import { isOwnerSessionId } from './session-id.js'
-import { createScheduler } from './scheduler.js'
-import { createTurnDriver } from './turn-driver.js'
-import { createWebMirror } from './web-mirror.js'
+} from './src/memory-store.js'
+import { historyTextOfInbound } from './src/message-format.js'
+import { createOutbound, outboundTarget } from './src/outbound.js'
+import { setPanelRuntime } from './src/panel-runtime.js'
+import { isOwnerSessionId } from './src/session-id.js'
+import { createScheduler } from './src/scheduler.js'
+import { createTurnDriver } from './src/turn-driver.js'
+import { createWebMirror } from './src/web-mirror.js'
 
 export const name = 'feishu-channel'
 /** 等服务可用后才激活；缺任何一个，本插件不会启动。 */

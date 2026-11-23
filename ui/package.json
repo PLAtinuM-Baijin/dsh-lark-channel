@@ -8,12 +8,14 @@
     ".": "./index.js",
     "./client": "./client.js",
     "./params": "./params.js",
+    "./presets": "./presets.js",
     "./package.json": "./package.json"
   },
   "files": [
     "index.js",
     "client.js",
     "params.js",
+    "presets.js",
     "package.json"
   ],
   "dsh": {

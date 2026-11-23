@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { clipQuestion, createWebMirror, webQuestionText } from '../web-mirror.js'
+import { clipQuestion, createWebMirror, webQuestionText } from '../src/web-mirror.js'
 
 test('webQuestionText：文本拼接，附件留占位符', () => {
   assert.equal(webQuestionText('  hi  '), 'hi')

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { isOwnerSessionId } from '../session-id.js'
+import { isOwnerSessionId } from '../src/session-id.js'
 
 test('isOwnerSessionId：只认主人私聊的每日会话 id', () => {
   const opts = { sessionPrefix: 'feishu-', ownerChatId: 'oc_owner' }
